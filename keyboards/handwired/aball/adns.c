@@ -70,6 +70,12 @@
 // pins
 #define NCS F7
 
+#define CLAMP_HID(value) value < -127 ? -127 : value > 127 ? 127 : value
+static bool scroll_pressed;
+static bool mouse_buttons_dirty;
+static int8_t scroll_h;
+static int8_t scroll_v;
+
 extern const uint16_t firmware_length;
 extern const uint8_t firmware_data[];
 
@@ -205,7 +211,7 @@ void pointing_device_init(void) {
     // 0x44 = 3400, default
     // 0x8e = 7100
     // 0xA4 = 8200, maximum
-    adns_write(REG_Configuration_I, 0x10);
+    adns_write(REG_Configuration_I, 0x14);
 
     wait_ms(100);
     dprint("INIT ENDED\n");
@@ -241,22 +247,93 @@ void readSensor(void) {
     adns_end();
 
 }
+
 void pointing_device_task(void) {
     readSensor();
-    report_mouse_t report = pointing_device_get_report();
+    report_mouse_t mouse_report = pointing_device_get_report();
 
-    if(motion_ind) {
-        // clamp deltas from -127 to 127
-        report.x = delta_x < -127 ? -127 : delta_x > 127 ? 127 : delta_x;
-        report.x = -report.x;
-        report.y = delta_y < -127 ? -127 : delta_y > 127 ? 127 : delta_y;
+    int8_t clamped_x = CLAMP_HID(delta_x);
+    int8_t clamped_y = CLAMP_HID(delta_y);
 
+    if(scroll_pressed) {
 
-        pointing_device_set_report(report);
+        // accumulate scroll
+        scroll_h += clamped_x;
+        scroll_v += clamped_y;
+
+        int8_t scaled_scroll_h = scroll_h / SCROLL_DIVIDER;
+        int8_t scaled_scroll_v = scroll_v / SCROLL_DIVIDER;
+
+        // clear accumulated scroll on assignment
+
+        if(scaled_scroll_h != 0){
+            mouse_report.h = -scaled_scroll_h;
+            scroll_h = 0;
+        }
+
+        if(scaled_scroll_v != 0){
+            mouse_report.v = -scaled_scroll_v;
+            scroll_v = 0;
+        }
+    }
+    else {
+        mouse_report.x = -clamped_x;
+        mouse_report.y = clamped_y;
+    }
+
+    pointing_device_set_report(mouse_report);
+
+    // only send report on change as even sending report with no change is treated as movement
+    if(mouse_buttons_dirty ||
+       mouse_report.x != 0 ||
+       mouse_report.y != 0 ||
+       mouse_report.h != 0 ||
+       mouse_report.v != 0){
+
+        mouse_buttons_dirty = false;
         pointing_device_send();
     }
-    // reset deltas
     delta_x = 0;
     delta_y = 0;
+}
 
+static void on_mouse_button(uint8_t mouse_button, keyrecord_t *record) {
+
+    report_mouse_t report = pointing_device_get_report();
+
+    if(record->event.pressed)
+        report.buttons |= mouse_button;
+    else
+        report.buttons &= ~mouse_button;
+
+    pointing_device_set_report(report);
+    mouse_buttons_dirty = true;
+}
+
+
+bool process_record_kb(uint16_t keycode, keyrecord_t *record) {
+    //uprintf("process_record_kb :::: %d\n", keycode);
+    if(!process_record_user(keycode, record))
+        return false;
+
+    switch (keycode) {
+        case KC_BTN1:
+            on_mouse_button(MOUSE_BTN1, record);
+            return false;
+
+        case KC_BTN2:
+            on_mouse_button(MOUSE_BTN2, record);
+            return false;
+
+        //case KC_BTN3:
+        //    on_mouse_button(MOUSE_BTN3, record);
+        //    return false;
+
+        case KC_BTN3:
+            scroll_pressed = record->event.pressed;
+            return false;
+
+        default:
+            return true;
+  }
 }

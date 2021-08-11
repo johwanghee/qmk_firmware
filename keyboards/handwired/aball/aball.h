@@ -27,8 +27,8 @@
  * represents the switch matrix.
  */
 #define LAYOUT( \
-    L00, L01 \
+    MCL, MCR, MSC \
 ) { \
-        { L00, L01 } \
+        { MCL, MCR, MSC } \
     }
 

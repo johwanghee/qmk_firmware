@@ -29,26 +29,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /* key matrix size */
 #define MATRIX_ROWS 1
-#define MATRIX_COLS 2
+#define MATRIX_COLS 3
 
-/*
- * Keyboard Matrix Assignments
- *
- * Change this to how you wired your keyboard
- * COLS: AVR pins used for columns, left to right
- * ROWS: AVR pins used for rows, top to bottom
- * DIODE_DIRECTION: COL2ROW = COL = Anode (+), ROW = Cathode (-, marked on diode)
- *                  ROW2COL = ROW = Anode (+), COL = Cathode (-, marked on diode)
- *
- */
-#define DIRECT_PINS { { D1, D0} }
+/* Keyboard Matrix Assignments */
+#define DIRECT_PINS { { D1, D0, D4 } }
 
-/* COL2ROW, ROW2COL*/
-#define DIODE_DIRECTION COL2ROW
+/* Much more so than a keyboard, speed matters for a mouse. So we'll go for as high
+   a polling rate as possible. */
+#define USB_POLLING_INTERVAL_MS 1
+#define USB_MAX_POWER_CONSUMPTION 100
+
+#define SCROLL_DIVIDER 120
 
 /* disable debug print */
 //#define NO_DEBUG
 
 /* disable print */
 //#define NO_PRINT
-
